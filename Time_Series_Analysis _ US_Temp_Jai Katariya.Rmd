@@ -1,0 +1,316 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+US Temperature - Time Series Analysis with predictions for next 18 days. 
+
+```{r}
+temp = read.csv("https://raw.githubusercontent.com/katariyj/Time-Series-in-R-Project/master/abc.csv")
+```
+
+```{r}
+temp
+```
+
+```{r}
+head(temp)
+tail(temp)
+```
+
+```{r}
+summary(temp)
+```
+
+```{r}
+dim(temp)
+```
+
+```{r}
+hist(x = temp$Starts)
+```
+
+```{r}
+str(temp)
+```
+```{r}
+names(temp)
+```
+
+```{r}
+plot(temp$Starts, type = "l", col="red")
+```
+
+```{r}
+# Advance EDA
+library(ggplot2)
+```
+
+```{r}
+qplot(temp$Starts, fill = I("blue"), 
+      alpha = I(.5), col= I("red"),
+      xlab = "Temperature",  
+      main="Histogram of US Temperature Index", 
+      bins = 25)
+```
+
+```{r}
+
+
+ggplot(temp, aes(x = temp$Starts))+ 
+  geom_density(color="red", fill="blue", alpha= 0.4)+ 
+  xlab("Temperature")+ 
+  ggtitle("Frequency Density Plot of Temperature")
+
+
+```
+
+```{r}
+
+library(ggfortify)
+library(stats)
+library(forecast)
+temp_start = ts(temp$Starts)
+temp_start1 = ts(temp$Starts, frequency = 15)
+
+
+autoplot(stl(temp_start1, s.window = 'periodic'), 
+         ts.colour = 'blue')
+
+ggtsdisplay(temp_start, 
+            main = "Temp Trend, ACF, PACF Plot")
+
+```
+
+
+Transformations and EDA - Log of Temperature
+```{r}
+logtemp = log(temp_start)
+
+logtemp1 = ts(logtemp, frequency = 15)
+
+
+autoplot(stl(logtemp1, s.window = 'periodic'), ts.colour = 'blue')
+
+ggtsdisplay(logtemp1, main = "Log Temperature Trend, ACF, PACF Plot")
+```
+Transformations and EDA -Differencing of Temperature
+```{r}
+diff_temp = diff(temp_start1)
+
+
+autoplot(stl(diff_temp, s.window = 'periodic'))
+
+ggtsdisplay(diff_temp, main = "Differencing of Temperature Trend, ACF, PACF Plot")
+```
+Transformations and EDA -Double Differencing of Temperature
+```{r}
+double_diff_temp = diff(diff_temp)
+
+
+autoplot(stl(double_diff_temp, s.window = 'periodic'))
+
+ggtsdisplay(double_diff_temp, main = "Double Differencing of Temperature Trend, ACF, PACF Plot")
+```
+
+Transformations and EDA -Differencing of Log Temperature
+```{r}
+diff_logtemp = diff(logtemp1)
+
+
+autoplot(stl(diff_logtemp, s.window = 'periodic'), ts.colour = 'blue')
+
+ggtsdisplay(diff_logtemp, main = "Differencing of Log Temperature Trend, ACF, PACF Plot")
+```
+Transformations and EDA -Double Differencing of Log Temperature
+```{r}
+double_diff_logtemp = diff(diff(logtemp1))
+
+
+autoplot(stl(double_diff_logtemp, s.window = 'periodic'), ts.colour = 'blue')
+
+ggtsdisplay(double_diff_logtemp, main = "Differencing of Log Temperature Trend, ACF, PACF Plot")
+```
+# This is good
+
+```{r}
+seasonal_diff_nolog = (diff(temp_start1, 12))
+autoplot(stl(seasonal_diff_nolog, s.window = 'periodic'), ts.colour = 'blue')
+
+ggtsdisplay(seasonal_diff_nolog, main = "Differencing of NO Log Temperature Trend, ACF, PACF Plot")
+```
+
+
+```{r}
+seasonal_diff_temp_log = (diff(logtemp1, 12))
+autoplot(stl(seasonal_diff_temp_log, s.window = 'periodic'), ts.colour = 'blue')
+
+ggtsdisplay(seasonal_diff_temp_log, main = "Differencing of Log Temperature Trend, ACF, PACF Plot")
+
+```
+# This is Bad.
+```{r}
+seasonal_diff = diff((diff(logtemp1, 12)),12)
+autoplot(stl(seasonal_diff, s.window = 'periodic'), ts.colour = 'blue')
+
+ggtsdisplay(seasonal_diff, main = "Differencing of Log Temperature Trend, ACF, PACF Plot")
+```
+
+Compare Histogram of  temperature and diff_log_temperature 
+```{r}
+
+require(gridExtra)
+seasonal_diff_Temp_nolog = qplot(seasonal_diff_nolog, fill = I("green"), alpha = I(.5), col= I("red"),xlab = "Seasonal Differencing of Temperature",  main="Seasonal Differencing of Temperature", bins = 25)
+
+Seasonal_diff_logtemp=qplot(seasonal_diff_temp_log, fill = I("blue"), alpha = I(.5), col= I("red"),xlab = "Seasonal Differencing of Log Temperature",  main="Seasonal Differencing of Log Temperature", bins = 25)
+grid.arrange(seasonal_diff_Temp_nolog, Seasonal_diff_logtemp, ncol=2)
+
+```
+Model on Original Data
+
+```{r}
+m1=arima(temp_start,order=c(4,0,0),seasonal=list(order=c(0,1,2),period=12))
+
+m1
+Box.test(m1$resid,lag=10,type='Ljung') 
+autoplot(acf(m1$resid, plot = FALSE))
+
+tsdiag(m1)
+```
+
+```{r}
+m2=arima(temp_start,order=c(4,0,4),seasonal=list(order=c(0,1,1),period=12))
+
+m2
+Box.test(m2$resid,lag=10,type='Ljung') 
+autoplot(acf(m2$resid, plot = FALSE))
+
+tsdiag(m1)
+```
+
+Model on Log data 
+
+```{r}
+m3=arima(logtemp,order=c(4,0,0),seasonal=list(order=c(0,1,2),period=12))
+
+m3
+Box.test(m3$resid,lag=10,type='Ljung') 
+autoplot(acf(m3$resid, plot = FALSE))
+
+tsdiag(m3)
+
+library(fUnitRoots)
+adfTest(m3$residuals)
+```
+
+```{r}
+m4=arima(logtemp,order=c(4,0,6),seasonal=list(order=c(0,1,1),period=12))
+
+m4
+Box.test(m4$resid,lag=10,type='Ljung') 
+autoplot(acf(m4$resid, plot = FALSE))
+
+tsdiag(m4)
+
+adfTest(m4$residuals)
+```
+
+```{r}
+m5=arima(logtemp,order=c(4,0,0),seasonal=list(order=c(0,1,1),period=12))
+
+m5
+Box.test(m5$resid,lag=10,type='Ljung') 
+autoplot(acf(m5$resid, plot = FALSE))
+
+tsdiag(m5)
+
+adfTest(m5$residuals)
+
+```
+
+```{r}
+m6=arima(logtemp,order=c(4,0,6),seasonal=list(order=c(0,1,2),period=12))
+
+m6
+Box.test(m6$resid,lag=10,type='Ljung') 
+autoplot(acf(m6$resid, plot = FALSE))
+
+tsdiag(m6)
+
+adfTest(m6$residuals)
+```
+
+
+```{r}
+
+m7=arima(logtemp,order=c(4,0,4),seasonal=list(order=c(0,1,1),period=12))
+
+m7
+Box.test(m7$resid,lag=10,type='Ljung') 
+autoplot(acf(m7$resid, plot = FALSE))
+
+tsdiag(m7)
+
+adfTest(m7$residuals)
+```
+
+```{r}
+
+```
+
+Forecasting for next n months
+
+```{r}
+source("fore.R")
+source("foreplot.R")
+source("backtest.R")
+
+
+pl = fore(m7, logtemp, 181, 8)
+foreplot(pl, logtemp, 181,0)
+
+
+```
+
+```{r}
+library(forecast)
+
+plot(forecast(m7, h= 10))
+
+lines(logtemp, col = "green")
+```
+
+Cross-Validation
+```{r}
+library(caTools)
+
+split = sample.split(logtemp, SplitRatio = 0.90)
+train= subset(logtemp, split==TRUE)
+print(train)
+test = subset(logtemp, split==FALSE)
+
+
+m_train=arima(train,order=c(4,0,4),seasonal=list(order=c(0,1,1),period=12))
+m_train
+
+```
+
+
+```{r}
+pred= predict(m_train, 18)
+
+error = test - pred$pred
+error
+```
+
+```{r}
+accuracy(pred$pred, test)
+```
+
+```{r}
+poly1=c(1,-m_train$coef[1:3])
+roots=polyroot(poly1)
+roots
+
+Mod(roots)
+```
